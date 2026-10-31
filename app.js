@@ -26,7 +26,7 @@
   }else els.forEach(function(el){el.classList.add("in")});
 
   /* صفحه محصول (مسیر جدید: #نام-محصول) */
-  var home=$("#home"),pv=$("#pv"),baseTitle=d.title,wasProduct=false;
+  var home=$("#home"),pv=$("#pv"),baseTitle=d.title,wasProduct=false,cameFromHome=false,booted=false,savedY=null;
   function safe(u){return typeof u==="string"&&(/^https:\/\//i.test(u)||/^[\w\-.]+$/.test(u))}
   function el(tag,cls,txt){var n=d.createElement(tag);if(cls)n.className=cls;if(txt)n.textContent=txt;return n}
 
@@ -51,6 +51,7 @@
     Object.keys(P).forEach(function(k){
       if(k===id)return;
       var a=el("a","glass");a.href="#"+k;a.setAttribute("data-p",k);
+      a.addEventListener("click",function(e){e.preventDefault();location.replace("#"+k)});
       var im=el("img");im.src=k+".webp";im.width=28;im.height=28;im.alt="";
       var s=el("span","",P[k].name);s.lang="en";s.dir="ltr";
       a.appendChild(im);a.appendChild(s);more.appendChild(a);
@@ -60,6 +61,7 @@
   function route(){
     var id=decodeURIComponent(location.hash.slice(1));
     if(Object.prototype.hasOwnProperty.call(P,id)){
+      if(!wasProduct){cameFromHome=booted;savedY=scrollY}
       home.hidden=true;pv.hidden=false;fill(id);
       d.title=P[id].name+" | PouOne";
       pv.classList.remove("enter");void pv.offsetWidth;pv.classList.add("enter");
@@ -68,12 +70,18 @@
     }else{
       pv.hidden=true;home.hidden=false;d.title=baseTitle;
       var t=id&&d.getElementById(id);
-      scrollTo(t?{top:t.getBoundingClientRect().top+scrollY-96,behavior:wasProduct?"instant":"smooth"}:{top:0,behavior:wasProduct?"instant":"smooth"});
-      wasProduct=false;
+      if(wasProduct&&cameFromHome&&savedY!==null)scrollTo({top:savedY,behavior:"instant"});
+      else scrollTo(t?{top:t.getBoundingClientRect().top+scrollY-96,behavior:wasProduct?"instant":"smooth"}:{top:0,behavior:wasProduct?"instant":"smooth"});
+      wasProduct=false;cameFromHome=false;
     }
   }
   addEventListener("hashchange",route);
-  route();
+  route();booted=true;
+
+  /* «بازگشت»: اگر از صفحه اصلی آمده‌ایم، یک قدم عقب می‌رویم تا تاریخچه دوبل نشود */
+  $(".pv__back").addEventListener("click",function(e){
+    if(cameFromHome){e.preventDefault();history.back()}
+  });
 
   $("#year").textContent=new Date().getFullYear();
 })();
