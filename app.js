@@ -3,14 +3,13 @@
   var d=document,root=d.documentElement,cfg=window.POUONE_CONFIG||{},P=window.POUONE_PRODUCTS||{};
   root.classList.add("js");
   var $=function(s,c){return(c||d).querySelector(s)};
-  var fa=function(n){return n.toLocaleString("fa-IR")};
 
   /* حالت تیره/روشن (پیش‌فرض: روشن) */
   var KEY="pouone-theme",saved=null;
   try{saved=localStorage.getItem(KEY)}catch(e){}
   function setTheme(t){
     root.setAttribute("data-theme",t);
-    $("#theme-label").textContent=t==="dark"?"حالت روشن":"حالت تیره";
+    var m=$('meta[name="theme-color"]');if(m)m.content=t==="dark"?"#060b18":"#e8eefa";
   }
   setTheme(saved==="dark"?"dark":"light");
   $("#theme").addEventListener("click",function(){
@@ -18,64 +17,63 @@
     setTheme(t);try{localStorage.setItem(KEY,t)}catch(e){}
   });
 
-  /* سایه نوار ناوبری */
-  var nav=$("#nav");
-  function onScroll(){nav.classList.toggle("is-stuck",scrollY>8)}
-  addEventListener("scroll",onScroll,{passive:true});onScroll();
-
   /* نمایش با اسکرول */
   var els=d.querySelectorAll(".reveal");
   els.forEach(function(el,i){el.style.setProperty("--d",(i%4)*.08+"s")});
   if("IntersectionObserver" in window){
-    var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add("in");io.unobserve(e.target)}})},{threshold:.15});
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add("in");io.unobserve(e.target)}})},{threshold:.12});
     els.forEach(function(el){io.observe(el)});
   }else els.forEach(function(el){el.classList.add("in")});
 
-  /* شمارنده آمار */
-  d.querySelectorAll("[data-count]").forEach(function(b){
-    var to=+b.dataset.count,t0=null;
-    if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;
-    (function step(t){t0=t0||t;var p=Math.min((t-t0)/1100,1);b.textContent=fa(Math.ceil(to*(1-Math.pow(1-p,3))));if(p<1)requestAnimationFrame(step)})(performance.now());
-  });
-
-  /* پنجره محصول */
-  var modal=$("#modal");
+  /* صفحه محصول (مسیر جدید: #نام-محصول) */
+  var home=$("#home"),pv=$("#pv"),baseTitle=d.title,wasProduct=false;
   function safe(u){return typeof u==="string"&&(/^https:\/\//i.test(u)||/^[\w\-.]+$/.test(u))}
-  function open(id){
-    var p=P[id],card=$('.card[data-product="'+id+'"]');if(!p||!card)return;
-    $("#m-logo").src=$(".card__logo",card).getAttribute("src");
-    $("#m-title").textContent=p.name;
-    $("#m-tag").textContent=$(".card__desc",card).textContent;
-    $("#m-desc").textContent=p.description;
-    var ul=$("#m-uses");ul.textContent="";
-    p.uses.forEach(function(t){var li=d.createElement("li");li.textContent=t;ul.appendChild(li)});
-    var box=$("#m-actions");box.textContent="";
+  function el(tag,cls,txt){var n=d.createElement(tag);if(cls)n.className=cls;if(txt)n.textContent=txt;return n}
+
+  function fill(id){
+    var p=P[id],card=$('.card[data-p="'+id+'"]');
+    pv.setAttribute("data-p",id);
+    $("#pv-logo").src=id+".webp";
+    $("#pv-title").textContent=p.name;
+    $("#pv-tag").textContent=card?$(".card__desc",card).textContent:"";
+    $("#pv-desc").textContent=p.description;
+    var ul=$("#pv-uses");ul.textContent="";
+    p.uses.forEach(function(t){ul.appendChild(el("li","",t))});
+    var box=$("#pv-actions");box.textContent="";
     var dl=(cfg.downloads||{})[id]||{};
-    [["android","دانلود نسخه اندروید"],["windows","دانلود نسخه ویندوز"]].forEach(function(o,i){
-      var a=d.createElement("a"),u=dl[o[0]];a.className="btn"+(i?"":" btn--primary");
-      if(safe(u)){a.href=u;a.textContent=o[1];a.setAttribute("download","")}
-      else{a.textContent=o[1].replace("دانلود","به‌زودی:");a.setAttribute("aria-disabled","true")}
+    [["android","نسخه اندروید"],["windows","نسخه ویندوز"]].forEach(function(o){
+      var a=el("a","btn btn--c"),u=dl[o[0]];
+      if(safe(u)){a.href=u;a.textContent="دانلود "+o[1];a.setAttribute("download","")}
+      else{a.textContent="به‌زودی: "+o[1];a.setAttribute("aria-disabled","true")}
       box.appendChild(a);
     });
-    modal.showModal();
+    var more=$("#pv-more");more.textContent="";
+    Object.keys(P).forEach(function(k){
+      if(k===id)return;
+      var a=el("a","glass");a.href="#"+k;a.setAttribute("data-p",k);
+      var im=el("img");im.src=k+".webp";im.width=28;im.height=28;im.alt="";
+      var s=el("span","",P[k].name);s.lang="en";s.dir="ltr";
+      a.appendChild(im);a.appendChild(s);more.appendChild(a);
+    });
   }
-  d.querySelectorAll(".card").forEach(function(c){c.addEventListener("click",function(){open(c.dataset.product)})});
-  d.querySelectorAll("[data-open]").forEach(function(a){a.addEventListener("click",function(e){e.preventDefault();open(a.dataset.open)})});
-  $("#m-close").addEventListener("click",function(){modal.close()});
-  modal.addEventListener("click",function(e){if(e.target===modal)modal.close()});
 
-  /* اطلاعات تماس (ایمیل و تلفن لینک‌دار؛ بقیه به‌صورت متن) */
-  var c=cfg.contact||{},list=$("#contact-list"),n=0;
-  [["email","ایمیل",function(v){return"mailto:"+v}],["phone","تلفن",function(v){return"tel:"+v.replace(/\s/g,"")}],
-   ["telegram","تلگرام",null],["instagram","اینستاگرام",null]
-  ].forEach(function(r){
-    var v=(c[r[0]]||"").trim();if(!v)return;n++;
-    var row=d.createElement("div"),dt=d.createElement("dt"),dd=d.createElement("dd"),el;
-    dt.textContent=r[1];
-    if(r[2]){el=d.createElement("a");el.href=r[2](v)}else el=d.createElement("span");
-    el.textContent=r[0]==="telegram"||r[0]==="instagram"?"@"+v:v;el.lang="en";el.dir="ltr";
-    dd.appendChild(el);row.appendChild(dt);row.appendChild(dd);list.appendChild(row);
-  });
-  if(!n)$("#contact-empty").hidden=false;
+  function route(){
+    var id=decodeURIComponent(location.hash.slice(1));
+    if(Object.prototype.hasOwnProperty.call(P,id)){
+      home.hidden=true;pv.hidden=false;fill(id);
+      d.title=P[id].name+" | PouOne";
+      pv.classList.remove("enter");void pv.offsetWidth;pv.classList.add("enter");
+      scrollTo({top:0,behavior:"instant"});
+      wasProduct=true;
+    }else{
+      pv.hidden=true;home.hidden=false;d.title=baseTitle;
+      var t=id&&d.getElementById(id);
+      scrollTo(t?{top:t.getBoundingClientRect().top+scrollY-96,behavior:wasProduct?"instant":"smooth"}:{top:0,behavior:wasProduct?"instant":"smooth"});
+      wasProduct=false;
+    }
+  }
+  addEventListener("hashchange",route);
+  route();
+
   $("#year").textContent=new Date().getFullYear();
 })();
